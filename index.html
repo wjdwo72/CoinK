@@ -226,15 +226,29 @@ details summary{cursor:pointer;color:var(--muted);padding:2px 0;user-select:none
 </head>
 <body>
 
-<!-- 로그인 오버레이 -->
+<!-- 로그인 오버레이 (비번만) -->
 <div id="loginOverlay">
   <div class="lbox">
     <h2>⚡ 코인 신호 스캐너</h2>
-    <p class="lsub">로그인 후 이용하세요</p>
-    <input id="loginId" type="text" placeholder="아이디" autocomplete="username" onkeydown="if(event.key==='Enter')document.getElementById('loginPw').focus()">
+    <p class="lsub">비밀번호를 입력하세요</p>
     <input id="loginPw" type="password" placeholder="비밀번호" autocomplete="current-password" onkeydown="if(event.key==='Enter')doLogin()">
     <div class="lerr" id="loginErr"></div>
-    <button class="lbtn" onclick="doLogin()">로그인</button>
+    <button class="lbtn" onclick="doLogin()">입장</button>
+  </div>
+</div>
+
+<!-- 설정 인증 팝업 (ID+PW) -->
+<div id="settingAuthOverlay" style="display:none;position:fixed;inset:0;background:#000c;z-index:8000;align-items:center;justify-content:center;">
+  <div class="lbox">
+    <h2>⚙ 설정 접근</h2>
+    <p class="lsub">관리자 아이디와 비밀번호를 입력하세요</p>
+    <input id="settingAuthId" type="text" placeholder="아이디" autocomplete="username" onkeydown="if(event.key==='Enter')document.getElementById('settingAuthPw').focus()">
+    <input id="settingAuthPw" type="password" placeholder="비밀번호" autocomplete="current-password" onkeydown="if(event.key==='Enter')doSettingAuth()">
+    <div class="lerr" id="settingAuthErr"></div>
+    <div style="display:flex;gap:8px">
+      <button class="lbtn" onclick="doSettingAuth()">확인</button>
+      <button onclick="closeSettingAuth()" style="flex:1;background:#1e293b;border:1px solid #374151;color:#94a3b8;border-radius:8px;padding:11px;font-size:14px;cursor:pointer">취소</button>
+    </div>
   </div>
 </div>
 
