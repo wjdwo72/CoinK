@@ -416,11 +416,60 @@ details summary{cursor:pointer;color:var(--muted);padding:2px 0;user-select:none
     <select id="tfSel" onchange="startScan()"><option value="15m">15분봉</option><option value="1h" selected>1시간봉</option><option value="4h">4시간봉</option><option value="1d">일봉</option></select>
     <select id="ivSel"><option value="0">수동</option><option value="30">30초</option><option value="60" selected>1분</option><option value="180">3분</option><option value="300">5분</option></select>
     <button id="scanBtn" onclick="startScan()">▶ 스캔</button>
+    <button onclick="openMonitor()" style="background:#1e3a5f;border-color:#1e3a5f;color:#7dd3fc;font-weight:600">📊 신호모니터</button>
+    <button onclick="toggleSoundPopup()" id="soundBtn" style="font-size:13px;padding:4px 8px" title="소리 설정">🔔</button>
     <button id="settingBtn" onclick="openSettings()">⚙</button>
     <span id="status" class="st-ok">대기</span>
     <span id="clock"></span>
   </div>
 </header>
+
+<!-- 소리 퀵 팝업 -->
+<div id="soundPopup" style="display:none;position:fixed;top:50px;right:60px;z-index:600;
+  background:#111827;border:1px solid #1f2d45;border-radius:12px;padding:14px 16px;
+  width:220px;box-shadow:0 8px 24px #000a;flex-direction:column;gap:10px;">
+  <div style="font-size:12px;font-weight:700;color:#06b6d4;margin-bottom:2px">🔔 소리 설정</div>
+  <div style="display:flex;flex-direction:column;gap:4px">
+    <label style="font-size:10px;color:#64748b">알림 소리</label>
+    <select id="qSoundMode" style="font-size:11px;background:#0b0e17;border:1px solid #1f2d45;color:#e2e8f0;border-radius:6px;padding:4px 6px"
+      onchange="cfg.soundMode=this.value;_soundOff=(this.value==='off');localStorage.setItem('coinSignalCfg',JSON.stringify(cfg))">
+      <option value="off">소리 꺼짐</option>
+      <option value="signal">신호 변화 시만</option>
+      <option value="strong">강력매수/강력매도만</option>
+      <option value="all">매수/매도 모두</option>
+    </select>
+  </div>
+  <div style="display:flex;flex-direction:column;gap:4px">
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <label style="font-size:10px;color:#64748b">볼륨</label>
+      <span id="qSoundVolVal" style="font-size:10px;color:#06b6d4;font-family:monospace">60%</span>
+    </div>
+    <input id="qSoundVol" type="range" min="0" max="100" value="60"
+      style="width:100%;accent-color:#06b6d4;padding:0;border:none;background:none"
+      oninput="document.getElementById('qSoundVolVal').textContent=this.value+'%';cfg.soundVol=parseInt(this.value);localStorage.setItem('coinSignalCfg',JSON.stringify(cfg))">
+  </div>
+  <div style="display:flex;gap:6px">
+    <div style="flex:1;display:flex;flex-direction:column;gap:3px">
+      <label style="font-size:10px;color:#ef4444">매수음(Hz)</label>
+      <select id="qBuyFreq" style="font-size:10px;background:#0b0e17;border:1px solid #1f2d45;color:#e2e8f0;border-radius:6px;padding:3px"
+        onchange="cfg.buyFreq=parseInt(this.value);localStorage.setItem('coinSignalCfg',JSON.stringify(cfg))">
+        <option value="880">고음 880</option>
+        <option value="1047" selected>중고음 1047</option>
+        <option value="1319">최고음 1319</option>
+      </select>
+    </div>
+    <div style="flex:1;display:flex;flex-direction:column;gap:3px">
+      <label style="font-size:10px;color:#3b82f6">매도음(Hz)</label>
+      <select id="qSellFreq" style="font-size:10px;background:#0b0e17;border:1px solid #1f2d45;color:#e2e8f0;border-radius:6px;padding:3px"
+        onchange="cfg.sellFreq=parseInt(this.value);localStorage.setItem('coinSignalCfg',JSON.stringify(cfg))">
+        <option value="294">저음 294</option>
+        <option value="370" selected>중저음 370</option>
+        <option value="440">중음 440</option>
+      </select>
+    </div>
+  </div>
+  <button onclick="testSound()" style="font-size:11px;padding:5px;width:100%;background:#1e293b;border:1px solid #374151;color:#94a3b8;border-radius:6px">🔔 테스트</button>
+</div>
 
 <div id="progressBar"><div id="progressFill"></div></div>
 
@@ -796,6 +845,29 @@ function saveSettings(){
       `전체 ${totalSymCount||'—'}개 중 ${cfg.scanCount}개 스캔`;
   }
 }
+function toggleSoundPopup(){
+  const p=document.getElementById('soundPopup');
+  if(p.style.display==='none'||p.style.display===''){
+    // 현재 cfg 값 동기화
+    document.getElementById('qSoundMode').value=cfg.soundMode||'signal';
+    document.getElementById('qSoundVol').value=cfg.soundVol??60;
+    document.getElementById('qSoundVolVal').textContent=(cfg.soundVol??60)+'%';
+    document.getElementById('qBuyFreq').value=cfg.buyFreq||1047;
+    document.getElementById('qSellFreq').value=cfg.sellFreq||370;
+    p.style.display='flex';
+  }else{
+    p.style.display='none';
+  }
+}
+// 팝업 바깥 클릭 시 닫기
+document.addEventListener('click',e=>{
+  const p=document.getElementById('soundPopup');
+  const btn=document.getElementById('soundBtn');
+  if(p&&p.style.display==='flex'&&!p.contains(e.target)&&e.target!==btn){
+    p.style.display='none';
+  }
+});
+
 function openSettings(){
   // 이미 설정 인증된 세션이면 바로 열기
   if(sessionStorage.getItem('settingAuthed')==='1'){
