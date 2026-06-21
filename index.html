@@ -703,14 +703,13 @@ function checkLogin(){
 
 function doLogin(){
   const auth=getAuth()||{id:'wjdwo72',pw:'4545'};
-  const id=document.getElementById('loginId').value.trim();
   const pw=document.getElementById('loginPw').value;
-  if(id===auth.id&&pw===auth.pw){
+  if(pw===auth.pw){
     sessionStorage.setItem('coinLoggedIn','1');
     document.getElementById('loginOverlay').classList.add('hidden');
     document.getElementById('loginErr').textContent='';
   }else{
-    document.getElementById('loginErr').textContent='아이디 또는 비밀번호가 틀립니다.';
+    document.getElementById('loginErr').textContent='비밀번호가 틀립니다.';
     document.getElementById('loginPw').value='';
     document.getElementById('loginPw').focus();
   }
@@ -797,8 +796,36 @@ function saveSettings(){
       `전체 ${totalSymCount||'—'}개 중 ${cfg.scanCount}개 스캔`;
   }
 }
-function openSettings(){document.getElementById('settingPanel').classList.add('open');}
+function openSettings(){
+  // 이미 설정 인증된 세션이면 바로 열기
+  if(sessionStorage.getItem('settingAuthed')==='1'){
+    document.getElementById('settingPanel').classList.add('open');
+  } else {
+    const o=document.getElementById('settingAuthOverlay');
+    o.style.display='flex';
+    document.getElementById('settingAuthId').value='';
+    document.getElementById('settingAuthPw').value='';
+    document.getElementById('settingAuthErr').textContent='';
+    setTimeout(()=>document.getElementById('settingAuthId').focus(),100);
+  }
+}
 function closeSettings(){document.getElementById('settingPanel').classList.remove('open');}
+function doSettingAuth(){
+  const auth=getAuth()||{id:'wjdwo72',pw:'4545'};
+  const id=document.getElementById('settingAuthId').value.trim();
+  const pw=document.getElementById('settingAuthPw').value;
+  if(id===auth.id&&pw===auth.pw){
+    sessionStorage.setItem('settingAuthed','1');
+    closeSettingAuth();
+    document.getElementById('settingPanel').classList.add('open');
+  } else {
+    document.getElementById('settingAuthErr').textContent='아이디 또는 비밀번호가 틀립니다.';
+    document.getElementById('settingAuthPw').value='';
+  }
+}
+function closeSettingAuth(){
+  document.getElementById('settingAuthOverlay').style.display='none';
+}
 
 // ══════════════════════════════════════════
 // 패턴 모달
