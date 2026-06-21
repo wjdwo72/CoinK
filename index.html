@@ -519,63 +519,67 @@ details summary{cursor:pointer;color:var(--muted);padding:2px 0;user-select:none
 // 한국 거래소 상장 정보
 // ══════════════════════════════════════════
 // ※ 거래소 상장 정보 (2025년 기준 / 변경될 수 있음)
-const KR_EX={
-  // ── 주요 대형코인 ──
-  BTC: {ko:'비트코인',     u:1,b:1,c:1},
-  ETH: {ko:'이더리움',     u:1,b:1,c:1},
-  XRP: {ko:'리플',         u:1,b:1,c:1},
-  SOL: {ko:'솔라나',       u:1,b:1,c:1},
-  BNB: {ko:'바이낸스코인', u:0,b:0,c:0}, // 국내 미상장
-  ADA: {ko:'에이다',       u:1,b:1,c:1},
-  DOGE:{ko:'도지코인',     u:1,b:1,c:1},
-  TRX: {ko:'트론',         u:1,b:1,c:1},
-  DOT: {ko:'폴카닷',       u:1,b:1,c:1},
-  LINK:{ko:'체인링크',     u:1,b:1,c:1},
-  LTC: {ko:'라이트코인',   u:1,b:1,c:1},
-  BCH: {ko:'비트코인캐시', u:1,b:1,c:1},
-  ETC: {ko:'이더리움클래식',u:1,b:1,c:1},
-  XLM: {ko:'스텔라루멘',   u:1,b:1,c:1},
-  EOS: {ko:'이오스',       u:1,b:1,c:1},
-  // ── 레이어1/2 ──
-  AVAX:{ko:'아발란체',     u:1,b:1,c:1},
-  ATOM:{ko:'코스모스',     u:1,b:1,c:1},
-  NEAR:{ko:'니어프로토콜', u:1,b:1,c:1},
-  ALGO:{ko:'알고랜드',     u:1,b:1,c:1},
-  VET: {ko:'비체인',       u:1,b:1,c:1},
-  APT: {ko:'앱토스',       u:1,b:1,c:0},
-  SUI: {ko:'수이',         u:1,b:1,c:0},
-  ARB: {ko:'아비트럼',     u:1,b:1,c:0},
-  OP:  {ko:'옵티미즘',     u:1,b:1,c:0},
-  MATIC:{ko:'폴리곤',      u:1,b:1,c:1},
-  ICP: {ko:'인터넷컴퓨터', u:1,b:0,c:0},
-  FIL: {ko:'파일코인',     u:1,b:1,c:0},
-  INJ: {ko:'인젝티브',     u:1,b:1,c:0},
-  SEI: {ko:'세이',         u:1,b:0,c:0},
-  // ── 밈코인 ──
-  PEPE:{ko:'페페',         u:1,b:1,c:0},
-  BONK:{ko:'봉크',         u:1,b:0,c:0},
-  WIF: {ko:'도그위프햇',   u:1,b:0,c:0},
-  FLOKI:{ko:'플로키',      u:1,b:0,c:0},
-  // ── 디파이/서비스 ──
-  SAND:{ko:'샌드박스',     u:1,b:1,c:0},
-  MANA:{ko:'디센트럴랜드', u:1,b:1,c:0},
-  JUP: {ko:'주피터',       u:1,b:0,c:0},
-  // ── 기타 ──
-  THETA:{ko:'세타',        u:1,b:0,c:0},
-  CHZ: {ko:'칠리즈',       u:1,b:1,c:0},
-  FLOW:{ko:'플로우',       u:1,b:0,c:0},
-  HBAR:{ko:'헤데라',       u:1,b:1,c:0},
-  AAVE:{ko:'에이브',       u:1,b:0,c:0},
-  UNI: {ko:'유니스왑',     u:1,b:1,c:0},
-  GRT: {ko:'그래프',       u:1,b:0,c:0},
-  LUNC:{ko:'테라클래식',   u:1,b:1,c:0},
-  STX: {ko:'스택스',       u:1,b:1,c:0},
-  CRO: {ko:'크로노스',     u:0,b:0,c:0},
-  ORDI:{ko:'오디',         u:1,b:0,c:0},
-  TON: {ko:'톤',           u:1,b:1,c:0},
-  NOT: {ko:'노트코인',     u:1,b:0,c:0},
-  PYTH:{ko:'파이스',       u:1,b:0,c:0},
+// 한글 이름 매핑 (거래소 데이터는 API로 동적 로딩)
+const KO_NAME={
+  BTC:'비트코인',ETH:'이더리움',XRP:'리플',SOL:'솔라나',BNB:'바이낸스코인',
+  ADA:'에이다',DOGE:'도지코인',TRX:'트론',DOT:'폴카닷',LINK:'체인링크',
+  LTC:'라이트코인',BCH:'비트코인캐시',ETC:'이더리움클래식',XLM:'스텔라루멘',
+  EOS:'이오스',AVAX:'아발란체',ATOM:'코스모스',NEAR:'니어프로토콜',
+  ALGO:'알고랜드',VET:'비체인',APT:'앱토스',SUI:'수이',ARB:'아비트럼',
+  OP:'옵티미즘',MATIC:'폴리곤',POL:'폴리곤',ICP:'인터넷컴퓨터',FIL:'파일코인',
+  INJ:'인젝티브',SEI:'세이',PEPE:'페페',BONK:'봉크',WIF:'도그위프햇',
+  FLOKI:'플로키',SAND:'샌드박스',MANA:'디센트럴랜드',JUP:'주피터',
+  THETA:'세타',CHZ:'칠리즈',FLOW:'플로우',HBAR:'헤데라',AAVE:'에이브',
+  UNI:'유니스왑',GRT:'그래프',LUNC:'테라클래식',STX:'스택스',CRO:'크로노스',
+  ORDI:'오디',TON:'톤',NOT:'노트코인',PYTH:'파이스',ZEC:'지캐시',
+  BLUR:'블러',CFX:'컨플럭스',GMX:'GMX',SNX:'신세틱스',LDO:'리도',
+  RUNE:'토르체인',KAVA:'카바',COMP:'컴파운드',CRV:'커브',MKR:'메이커',
+  ONE:'하모니',ZIL:'질리카',IOTA:'아이오타',ICX:'아이콘',TFUEL:'세타퓨엘',
+  QTUM:'퀀텀',BTG:'비트코인골드',MTL:'메탈',SXP:'솔라',STPT:'스탠다드토큰',
+  HUNT:'헌트',MED:'메디블록',MVL:'엠블',WAXP:'왁스',STRAX:'스트라티스',
 };
+
+// 거래소별 상장 코인 (API 로딩 전 기본값 — 모두 미상장으로 초기화)
+let KR_EX={};
+
+// 업비트·빗썸·코인원 공개 API로 실제 상장 종목 로드
+async function loadKrExchanges(){
+  const results={upbit:new Set(),bithumb:new Set(),coinone:new Set()};
+  try{
+    const r=await fetch('https://api.upbit.com/v1/market/all');
+    const d=await r.json();
+    d.forEach(m=>{if(m.market.startsWith('KRW-'))results.upbit.add(m.market.split('-')[1]);});
+  }catch(e){console.warn('업비트 API 오류',e);}
+  try{
+    const r=await fetch('https://api.bithumb.com/public/ticker/ALL_KRW');
+    const d=await r.json();
+    if(d.status==='0000')Object.keys(d.data).forEach(k=>{if(k!=='date')results.bithumb.add(k);});
+  }catch(e){console.warn('빗썸 API 오류',e);}
+  // 코인원은 CORS 차단 — 알려진 상장 목록 사용 (2025 기준)
+  ['BTC','ETH','XRP','SOL','ADA','DOGE','TRX','DOT','LINK','LTC','BCH','ETC',
+   'XLM','EOS','AVAX','ATOM','NEAR','MATIC','POL','ARB','OP','PEPE','SAND',
+   'MANA','CHZ','HBAR','UNI','AAVE','GRT','COMP','MKR','SNX','CRV',
+   'ALGO','VET','FIL','ZIL','ICX','QTUM','IOTA','BTG','MTL','WAXP',
+   'SXP','STPT','HUNT','MED','MVL','STRAX','ONE'].forEach(s=>results.coinone.add(s));
+
+  // KR_EX 재구성
+  const allCoins=new Set([...results.upbit,...results.bithumb,...results.coinone]);
+  allCoins.forEach(sym=>{
+    KR_EX[sym]={
+      ko: KO_NAME[sym]||'',
+      u: results.upbit.has(sym)?1:0,
+      b: results.bithumb.has(sym)?1:0,
+      c: results.coinone.has(sym)?1:0,
+    };
+  });
+  // 국내 미상장 코인도 한글이름 유지
+  Object.keys(KO_NAME).forEach(sym=>{
+    if(!KR_EX[sym])KR_EX[sym]={ko:KO_NAME[sym],u:0,b:0,c:0};
+  });
+  console.log(`거래소 데이터 로드: 업비트${results.upbit.size} 빗썸${results.bithumb.size} 코인원${results.coinone.size}`);
+  // 카드 재렌더 (이미 스캔 결과 있으면)
+  if(lastResults.length)renderGrid(lastResults);
+}
 
 // ══════════════════════════════════════════
 // 패턴 설명 & SVG
@@ -1729,7 +1733,9 @@ function renderMonitor(){
 loadSettings();
 checkLogin();
 fetchKrwRate();
+loadKrExchanges();
 setInterval(fetchKrwRate,300000);
+setInterval(loadKrExchanges,3600000); // 1시간마다 거래소 데이터 갱신
 window.addEventListener('load',startScan);
 </script>
 </body>
