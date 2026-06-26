@@ -1741,8 +1741,6 @@ function updateSummary(res,elapsed){
 
 function setStatus(t,c){const el=document.getElementById('status');el.textContent=t;el.className=`st-${c}`;}
 
-function sigKo(s){return{STRONG_BUY:'강력매수',BUY:'매수',SELL:'매도',STRONG_SELL:'강력매도',HOLD:'관망'}[s]||s;}
-
 function showToast(sym,sig,price){
   const meta=KR_EX[sym.replace('USDT','')]||{};
   const div=document.createElement('div');
