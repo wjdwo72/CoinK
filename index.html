@@ -435,7 +435,10 @@ details summary{cursor:pointer;color:var(--muted);padding:2px 0;user-select:none
   </div>
   <!-- 잔고 요약 -->
   <div class="pp-stat" id="paperStat">
-    <div class="pp-sv"><div class="pv" id="ppBalance" style="color:#a855f7">0</div><div class="pl">예수금(KRW)</div></div>
+    <div class="pp-sv" onclick="editPaperBalance()" title="클릭하여 수정" style="cursor:pointer">
+      <div class="pv" id="ppBalance" style="color:#a855f7">0</div>
+      <div class="pl">예수금 ✏️</div>
+    </div>
     <div class="pp-sv"><div class="pv" id="ppPnl" style="color:#64748b">0</div><div class="pl">누적손익</div></div>
     <div class="pp-sv"><div class="pv" id="ppRate" style="color:#64748b">0%</div><div class="pl">수익률</div></div>
   </div>
@@ -890,6 +893,16 @@ function setPaperTab(el,tab){
   document.getElementById('ppPos').style.display=tab==='pos'?'block':'none';
   document.getElementById('ppHist').style.display=tab==='hist'?'block':'none';
   document.getElementById('ppCfg').style.display=tab==='cfg'?'block':'none';
+}
+
+function editPaperBalance(){
+  const cur=paper.balance;
+  const input=prompt(`예수금을 입력하세요 (현재: ₩${cur.toLocaleString()})`, cur);
+  if(input===null)return;
+  const v=parseInt(input.replace(/,/g,''))||cur;
+  if(v<0||isNaN(v))return;
+  paper.balance=v; paper.initBalance=v;
+  savePaper(); renderPaper();
 }
 
 function setPaperBalance(){
