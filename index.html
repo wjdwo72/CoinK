@@ -219,6 +219,21 @@ details summary{cursor:pointer;color:var(--muted);padding:2px 0;user-select:none
 .lbtn{background:#1d4ed8;border:none;color:#fff;border-radius:8px;padding:11px;font-size:14px;font-weight:700;cursor:pointer;width:100%;}
 .lbtn:hover{background:#2563eb;}
 
+/* ── 모의투자 패널 ── */
+#paperPanel{display:none;position:fixed;top:60px;left:16px;z-index:400;
+  width:420px;height:560px;min-width:280px;min-height:200px;
+  background:#0f172a;border:1px solid #1f2d45;border-radius:14px;
+  overflow:hidden;box-shadow:0 8px 32px #000a;flex-direction:column;}
+.pp-tab{display:flex;border-bottom:1px solid #1f2d45;}
+.pp-tb{flex:1;padding:7px;font-size:11px;background:none;border:none;color:#64748b;cursor:pointer;border-bottom:2px solid transparent;}
+.pp-tb.on{color:#06b6d4;border-bottom-color:#06b6d4;}
+.pp-stat{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;padding:8px 10px;background:#0b0e17;}
+.pp-sv{background:#111827;border-radius:8px;padding:7px 10px;text-align:center;}
+.pp-sv .pv{font-size:14px;font-weight:700;font-family:monospace;}
+.pp-sv .pl{font-size:9px;color:#64748b;margin-top:2px;}
+.pp-row{display:flex;align-items:center;gap:6px;padding:5px 10px;border-bottom:1px solid #0f1729;font-size:11px;}
+.pp-win{color:#ef4444;}.pp-loss{color:#3b82f6;}.pp-hold{color:#eab308;}
+
 /* ── 신호 모니터 row 레이아웃 ── */
 #monitorList.row-layout{flex-direction:row;flex-wrap:wrap;align-content:flex-start;overflow-y:auto;overflow-x:hidden;}
 #monitorList.row-layout .mon-item{width:calc(50% - 4px);min-width:140px;box-sizing:border-box;}
@@ -283,7 +298,7 @@ details summary{cursor:pointer;color:var(--muted);padding:2px 0;user-select:none
     <div class="sp-row">
       <label>알림 소리</label>
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-        <select id="soundMode" style="flex:1;min-width:130px" onchange="cfg.soundMode=this.value;_soundOff=(this.value==='off');localStorage.setItem('coinSignalCfg',JSON.stringify(cfg))">
+        <select id="soundMode" style="flex:1;min-width:130px" onchange="setSoundMode(this.value)">
           <option value="off">소리 꺼짐</option>
           <option value="signal" selected>신호 변화 시만</option>
           <option value="strong">강력매수/강력매도만</option>
@@ -408,6 +423,81 @@ details summary{cursor:pointer;color:var(--muted);padding:2px 0;user-select:none
   </div>
 </div>
 
+<!-- 모의투자 패널 -->
+<div id="paperPanel">
+  <div style="display:flex;align-items:center;gap:8px;padding:10px 14px;background:#111827;border-bottom:1px solid #1f2d45;cursor:move" id="paperHeader">
+    <span style="font-size:13px;font-weight:700;color:#a855f7">📈 모의투자</span>
+    <span id="paperStatusBadge" style="font-size:10px;padding:1px 7px;border-radius:10px;background:#1e293b;color:#64748b">OFF</span>
+    <span style="margin-left:auto;display:flex;gap:6px;align-items:center">
+      <button onclick="togglePaperAuto()" id="paperAutoBtn" style="font-size:10px;padding:2px 8px;background:#1e293b;border:1px solid #374151;color:#94a3b8;border-radius:6px">자동매매 OFF</button>
+      <button onclick="closePaperPanel()" style="font-size:12px;padding:2px 8px;background:none;border:none;color:#64748b;cursor:pointer">✕</button>
+    </span>
+  </div>
+  <!-- 잔고 요약 -->
+  <div class="pp-stat" id="paperStat">
+    <div class="pp-sv"><div class="pv" id="ppBalance" style="color:#a855f7">0</div><div class="pl">예수금(KRW)</div></div>
+    <div class="pp-sv"><div class="pv" id="ppPnl" style="color:#64748b">0</div><div class="pl">누적손익</div></div>
+    <div class="pp-sv"><div class="pv" id="ppRate" style="color:#64748b">0%</div><div class="pl">수익률</div></div>
+  </div>
+  <!-- 탭 -->
+  <div class="pp-tab">
+    <button class="pp-tb on" onclick="setPaperTab(this,'pos')">포지션</button>
+    <button class="pp-tb"    onclick="setPaperTab(this,'hist')">거래내역</button>
+    <button class="pp-tb"    onclick="setPaperTab(this,'cfg')">설정</button>
+  </div>
+  <!-- 포지션 탭 -->
+  <div id="ppPos" style="overflow-y:auto;flex:1;padding:4px 0">
+    <div style="text-align:center;color:#64748b;font-size:11px;padding:20px">포지션 없음</div>
+  </div>
+  <!-- 거래내역 탭 -->
+  <div id="ppHist" style="display:none;overflow-y:auto;flex:1">
+    <div style="text-align:center;color:#64748b;font-size:11px;padding:20px">거래 없음</div>
+  </div>
+  <!-- 설정 탭 -->
+  <div id="ppCfg" style="display:none;overflow-y:auto;flex:1;padding:12px">
+    <div style="display:flex;flex-direction:column;gap:10px">
+      <div style="display:flex;flex-direction:column;gap:4px">
+        <label style="font-size:11px;color:#64748b">초기 예수금 (KRW)</label>
+        <div style="display:flex;gap:6px">
+          <input id="ppInitBalance" type="number" value="1000000" step="100000"
+            style="flex:1;background:#0b0e17;border:1px solid #1f2d45;color:#e2e8f0;border-radius:6px;padding:6px 10px;font-size:13px">
+          <button onclick="setPaperBalance()" style="font-size:11px;padding:5px 10px;background:#6b21a8;border-color:#7c3aed;color:#e9d5ff">적용</button>
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:4px">
+        <label style="font-size:11px;color:#64748b">매매당 투자비율</label>
+        <select id="ppTradeRatio" onchange="paper.tradeRatio=parseFloat(this.value);savePaper()" style="background:#0b0e17;border:1px solid #1f2d45;color:#e2e8f0;border-radius:6px;padding:6px">
+          <option value="0.05">잔고의 5%</option>
+          <option value="0.10" selected>잔고의 10%</option>
+          <option value="0.20">잔고의 20%</option>
+          <option value="0.30">잔고의 30%</option>
+          <option value="0.50">잔고의 50%</option>
+        </select>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:4px">
+        <label style="font-size:11px;color:#64748b">매매 신호 조건</label>
+        <select id="ppSigCond" onchange="paper.sigCond=this.value;savePaper()" style="background:#0b0e17;border:1px solid #1f2d45;color:#e2e8f0;border-radius:6px;padding:6px">
+          <option value="strong">강력매수/강력매도만</option>
+          <option value="all" selected>매수/매도 이상</option>
+        </select>
+      </div>
+      <button onclick="resetPaper()" style="background:#450a0a;border:1px solid #7f1d1d;color:#fca5a5;padding:7px;border-radius:6px;font-size:11px">🗑 모의투자 초기화</button>
+    </div>
+  </div>
+  <!-- 리사이즈 핸들 -->
+  <div class="rz-edge" data-d="n"  style="position:absolute;top:0;left:8px;right:8px;height:5px;cursor:n-resize;z-index:10"></div>
+  <div class="rz-edge" data-d="s"  style="position:absolute;bottom:0;left:8px;right:8px;height:5px;cursor:s-resize;z-index:10"></div>
+  <div class="rz-edge" data-d="w"  style="position:absolute;top:8px;bottom:8px;left:0;width:5px;cursor:w-resize;z-index:10"></div>
+  <div class="rz-edge" data-d="e"  style="position:absolute;top:8px;bottom:8px;right:0;width:5px;cursor:e-resize;z-index:10"></div>
+  <div class="rz-edge" data-d="nw" style="position:absolute;top:0;left:0;width:10px;height:10px;cursor:nw-resize;z-index:11"></div>
+  <div class="rz-edge" data-d="ne" style="position:absolute;top:0;right:0;width:10px;height:10px;cursor:ne-resize;z-index:11"></div>
+  <div class="rz-edge" data-d="sw" style="position:absolute;bottom:0;left:0;width:10px;height:10px;cursor:sw-resize;z-index:11"></div>
+  <div class="rz-edge" data-d="se" style="position:absolute;bottom:0;right:0;width:16px;height:16px;cursor:se-resize;z-index:11;
+    display:flex;align-items:flex-end;justify-content:flex-end;padding:2px;opacity:.5">
+    <svg width="9" height="9" viewBox="0 0 9 9"><path d="M1 8L8 1M4 8L8 4" stroke="#94a3b8" stroke-width="1.5" stroke-linecap="round"/></svg>
+  </div>
+</div>
+
 <header>
   <h1>&#9719; 코인 실시간 매매 신호</h1>
   <div class="hr">
@@ -417,6 +507,7 @@ details summary{cursor:pointer;color:var(--muted);padding:2px 0;user-select:none
     <select id="ivSel"><option value="0">수동</option><option value="30">30초</option><option value="60" selected>1분</option><option value="180">3분</option><option value="300">5분</option></select>
     <button id="scanBtn" onclick="startScan()">▶ 스캔</button>
     <button onclick="openMonitor()" style="background:#1e3a5f;border-color:#1e3a5f;color:#7dd3fc;font-weight:600">📊 신호모니터</button>
+    <button onclick="openPaperPanel()" style="background:#4a1d96;border-color:#6d28d9;color:#e9d5ff;font-weight:600">📈 모의투자</button>
     <button onclick="toggleSoundPopup()" id="soundBtn" style="font-size:13px;padding:4px 8px" title="소리 설정">🔔</button>
     <button id="settingBtn" onclick="openSettings()">⚙</button>
     <span id="status" class="st-ok">대기</span>
@@ -432,7 +523,7 @@ details summary{cursor:pointer;color:var(--muted);padding:2px 0;user-select:none
   <div style="display:flex;flex-direction:column;gap:4px">
     <label style="font-size:10px;color:#64748b">알림 소리</label>
     <select id="qSoundMode" style="font-size:11px;background:#0b0e17;border:1px solid #1f2d45;color:#e2e8f0;border-radius:6px;padding:4px 6px"
-      onchange="cfg.soundMode=this.value;_soundOff=(this.value==='off');localStorage.setItem('coinSignalCfg',JSON.stringify(cfg))">
+      onchange="setSoundMode(this.value)">
       <option value="off">소리 꺼짐</option>
       <option value="signal">신호 변화 시만</option>
       <option value="strong">강력매수/강력매도만</option>
@@ -446,13 +537,13 @@ details summary{cursor:pointer;color:var(--muted);padding:2px 0;user-select:none
     </div>
     <input id="qSoundVol" type="range" min="0" max="100" value="60"
       style="width:100%;accent-color:#06b6d4;padding:0;border:none;background:none"
-      oninput="document.getElementById('qSoundVolVal').textContent=this.value+'%';cfg.soundVol=parseInt(this.value);localStorage.setItem('coinSignalCfg',JSON.stringify(cfg))">
+      oninput="setSoundVol(this.value)">
   </div>
   <div style="display:flex;gap:6px">
     <div style="flex:1;display:flex;flex-direction:column;gap:3px">
       <label style="font-size:10px;color:#ef4444">매수음(Hz)</label>
       <select id="qBuyFreq" style="font-size:10px;background:#0b0e17;border:1px solid #1f2d45;color:#e2e8f0;border-radius:6px;padding:3px"
-        onchange="cfg.buyFreq=parseInt(this.value);localStorage.setItem('coinSignalCfg',JSON.stringify(cfg))">
+        onchange="setBuyFreq(this.value)">
         <option value="880">고음 880</option>
         <option value="1047" selected>중고음 1047</option>
         <option value="1319">최고음 1319</option>
@@ -461,7 +552,7 @@ details summary{cursor:pointer;color:var(--muted);padding:2px 0;user-select:none
     <div style="flex:1;display:flex;flex-direction:column;gap:3px">
       <label style="font-size:10px;color:#3b82f6">매도음(Hz)</label>
       <select id="qSellFreq" style="font-size:10px;background:#0b0e17;border:1px solid #1f2d45;color:#e2e8f0;border-radius:6px;padding:3px"
-        onchange="cfg.sellFreq=parseInt(this.value);localStorage.setItem('coinSignalCfg',JSON.stringify(cfg))">
+        onchange="setSellFreq(this.value)">
         <option value="294">저음 294</option>
         <option value="370" selected>중저음 370</option>
         <option value="440">중음 440</option>
@@ -735,7 +826,216 @@ let curFilter='ALL', curEx='ALL', scanTimer=null, lastResults=[], prevSigs={};
 let usdKrw=1380, tgSentCount=0, totalSymCount=0;
 let cfg={token:'',chatId:'',minSig:'BUY,SELL,STRONG_BUY,STRONG_SELL',tgExFilter:'ALL',scanCount:100,
   soundMode:'signal',soundVol:60,buyFreq:1047,sellFreq:370,monLayout:'list'};
-let _soundOff=false;
+
+// 소리 모드 변경 — 인라인 핸들러에서 함수로 호출 (let 변수 직접 접근 대신)
+function setSoundMode(val){
+  cfg.soundMode=val;
+  localStorage.setItem('coinSignalCfg',JSON.stringify(cfg));
+  syncSettingsFromCfg();
+}
+function setSoundVol(val){
+  cfg.soundVol=parseInt(val);
+  localStorage.setItem('coinSignalCfg',JSON.stringify(cfg));
+  syncSettingsFromCfg();
+}
+function setBuyFreq(val){cfg.buyFreq=parseInt(val);localStorage.setItem('coinSignalCfg',JSON.stringify(cfg));}
+function setSellFreq(val){cfg.sellFreq=parseInt(val);localStorage.setItem('coinSignalCfg',JSON.stringify(cfg));}
+
+// ══════════════════════════════════════════
+// 모의투자
+// ══════════════════════════════════════════
+let paper={
+  enabled:false,
+  initBalance:1000000,
+  balance:1000000,
+  tradeRatio:0.10,
+  sigCond:'all',
+  positions:{},  // {sym:{qty,entryPrice,entryTime,entryKrw}}
+  trades:[],     // 거래내역
+};
+
+function loadPaper(){
+  const s=localStorage.getItem('coinPaper');
+  if(s)try{const d=JSON.parse(s);Object.assign(paper,d);}catch{}
+}
+function savePaper(){localStorage.setItem('coinPaper',JSON.stringify(paper));}
+
+function openPaperPanel(){
+  const p=document.getElementById('paperPanel');
+  p.style.display='flex';
+  renderPaper();
+  document.getElementById('ppInitBalance').value=paper.initBalance;
+  document.getElementById('ppTradeRatio').value=paper.tradeRatio;
+  document.getElementById('ppSigCond').value=paper.sigCond;
+}
+function closePaperPanel(){document.getElementById('paperPanel').style.display='none';}
+
+function togglePaperAuto(){
+  paper.enabled=!paper.enabled;
+  savePaper();
+  const btn=document.getElementById('paperAutoBtn');
+  const badge=document.getElementById('paperStatusBadge');
+  if(paper.enabled){
+    btn.textContent='자동매매 ON';btn.style.background='#4a1d96';btn.style.borderColor='#7c3aed';btn.style.color='#e9d5ff';
+    badge.textContent='ON';badge.style.background='#4a1d96';badge.style.color='#e9d5ff';
+  }else{
+    btn.textContent='자동매매 OFF';btn.style.background='#1e293b';btn.style.borderColor='#374151';btn.style.color='#94a3b8';
+    badge.textContent='OFF';badge.style.background='#1e293b';badge.style.color='#64748b';
+  }
+}
+
+function setPaperTab(el,tab){
+  document.querySelectorAll('.pp-tb').forEach(b=>b.classList.remove('on'));
+  el.classList.add('on');
+  document.getElementById('ppPos').style.display=tab==='pos'?'block':'none';
+  document.getElementById('ppHist').style.display=tab==='hist'?'block':'none';
+  document.getElementById('ppCfg').style.display=tab==='cfg'?'block':'none';
+}
+
+function setPaperBalance(){
+  const v=parseInt(document.getElementById('ppInitBalance').value)||1000000;
+  paper.initBalance=v; paper.balance=v;
+  savePaper(); renderPaper();
+}
+
+function resetPaper(){
+  if(!confirm('모의투자 데이터를 초기화할까요?'))return;
+  paper.balance=paper.initBalance;
+  paper.positions={};paper.trades=[];
+  savePaper();renderPaper();
+}
+
+// 모의 매수
+function paperBuy(sym,price,sig){
+  if(paper.positions[sym])return; // 이미 포지션 있음
+  const krwRate=usdKrw||1380;
+  const tradeKrw=paper.balance*paper.tradeRatio;
+  if(tradeKrw<1000)return; // 잔고 부족
+  const tradeUsd=tradeKrw/krwRate;
+  const qty=tradeUsd/price;
+  paper.balance-=tradeKrw;
+  paper.positions[sym]={qty,entryPrice:price,entryTime:new Date().toISOString(),entryKrw:tradeKrw,sig};
+  savePaper();renderPaper();
+}
+
+// 모의 매도
+function paperSell(sym,price,sig){
+  const pos=paper.positions[sym];
+  if(!pos)return;
+  const krwRate=usdKrw||1380;
+  const exitKrw=pos.qty*price*krwRate;
+  const pnl=exitKrw-pos.entryKrw;
+  const pnlPct=(pnl/pos.entryKrw*100).toFixed(2);
+  paper.balance+=exitKrw;
+  paper.trades.unshift({
+    sym,buySig:pos.sig,sellSig:sig,
+    entryPrice:pos.entryPrice,exitPrice:price,
+    entryKrw:pos.entryKrw,exitKrw,pnl,pnlPct,
+    entryTime:pos.entryTime,exitTime:new Date().toISOString(),
+  });
+  if(paper.trades.length>200)paper.trades=paper.trades.slice(0,200);
+  delete paper.positions[sym];
+  savePaper();renderPaper();
+}
+
+// 신호 발생 시 자동매매 실행
+function paperAutoTrade(sym,sig,price){
+  if(!paper.enabled)return;
+  const cond=paper.sigCond||'all';
+  const isBuySignal=sig==='STRONG_BUY'||(cond==='all'&&sig==='BUY');
+  const isSellSignal=sig==='STRONG_SELL'||(cond==='all'&&sig==='SELL');
+  if(isBuySignal)paperBuy(sym,price,sig);
+  if(isSellSignal)paperSell(sym,price,sig);
+}
+
+function fmtKrw(v){
+  if(Math.abs(v)>=1e8)return (v/1e8).toFixed(2)+'억';
+  if(Math.abs(v)>=1e4)return Math.round(v/1e4)+'만';
+  return Math.round(v).toLocaleString();
+}
+
+function renderPaper(){
+  // 상단 통계
+  const totalInvested=Object.values(paper.positions).reduce((s,p)=>s+p.entryKrw,0);
+  const krwRate=usdKrw||1380;
+  const posValue=Object.entries(paper.positions).reduce((s,[sym,pos])=>{
+    const r=lastResults.find(r=>r.sym===sym);
+    return s+(r?pos.qty*r.price*krwRate:pos.entryKrw);
+  },0);
+  const totalAsset=paper.balance+posValue;
+  const pnl=totalAsset-paper.initBalance;
+  const rate=paper.initBalance>0?(pnl/paper.initBalance*100).toFixed(2):0;
+  const pnlCol=pnl>0?'#ef4444':pnl<0?'#3b82f6':'#64748b';
+
+  document.getElementById('ppBalance').textContent='₩'+fmtKrw(paper.balance);
+  document.getElementById('ppPnl').textContent=(pnl>=0?'+':'')+fmtKrw(pnl)+'원';
+  document.getElementById('ppPnl').style.color=pnlCol;
+  document.getElementById('ppRate').textContent=(rate>=0?'+':'')+rate+'%';
+  document.getElementById('ppRate').style.color=pnlCol;
+
+  // 자동매매 버튼 상태
+  const btn=document.getElementById('paperAutoBtn');
+  const badge=document.getElementById('paperStatusBadge');
+  if(paper.enabled){
+    btn.textContent='자동매매 ON';btn.style.background='#4a1d96';btn.style.borderColor='#7c3aed';btn.style.color='#e9d5ff';
+    badge.textContent='ON';badge.style.background='#4a1d96';badge.style.color='#e9d5ff';
+  }
+
+  // 포지션 탭
+  const posEl=document.getElementById('ppPos');
+  const posList=Object.entries(paper.positions);
+  if(!posList.length){
+    posEl.innerHTML='<div style="text-align:center;color:#64748b;font-size:11px;padding:20px">포지션 없음</div>';
+  }else{
+    posEl.innerHTML=posList.map(([sym,pos])=>{
+      const r=lastResults.find(r=>r.sym===sym);
+      const curPrice=r?r.price:pos.entryPrice;
+      const curKrw=pos.qty*curPrice*krwRate;
+      const upnl=curKrw-pos.entryKrw;
+      const upnlPct=(upnl/pos.entryKrw*100).toFixed(2);
+      const col=upnl>0?'#ef4444':upnl<0?'#3b82f6':'#64748b';
+      const base=sym.replace('USDT','');
+      return`<div class="pp-row">
+        <div style="flex:1">
+          <div style="font-weight:700;font-size:12px">${base} <span style="font-size:9px;color:#a855f7">${sigKo(pos.sig)}</span></div>
+          <div style="font-size:10px;color:#64748b;margin-top:1px">진입 $${fp(pos.entryPrice)} → 현재 $${fp(curPrice)}</div>
+          <div style="font-size:10px;color:#64748b">투자 ₩${fmtKrw(pos.entryKrw)}</div>
+        </div>
+        <div style="text-align:right">
+          <div style="color:${col};font-weight:700;font-size:12px;font-family:monospace">${upnl>=0?'+':''}${fmtKrw(upnl)}원</div>
+          <div style="color:${col};font-size:10px">${upnlPct>=0?'+':''}${upnlPct}%</div>
+          <button onclick="paperSell('${sym}',${curPrice},'수동')" style="margin-top:3px;font-size:9px;padding:2px 7px;background:#1e3a8a;border-color:#1d4ed8;color:#bfdbfe;border-radius:4px">청산</button>
+        </div>
+      </div>`;
+    }).join('');
+  }
+
+  // 거래내역 탭
+  const histEl=document.getElementById('ppHist');
+  if(!paper.trades.length){
+    histEl.innerHTML='<div style="text-align:center;color:#64748b;font-size:11px;padding:20px">거래 없음</div>';
+  }else{
+    const tot=paper.trades.length;
+    const wins=paper.trades.filter(t=>t.pnl>0).length;
+    histEl.innerHTML=`<div style="padding:6px 10px;background:#0b0e17;font-size:10px;color:#64748b;display:flex;gap:10px">
+      <span>총 ${tot}건</span><span style="color:#ef4444">수익 ${wins}건</span><span style="color:#3b82f6">손실 ${tot-wins}건</span>
+      <span style="margin-left:auto;color:${pnl>=0?'#ef4444':'#3b82f6'}">${pnl>=0?'+':''}${fmtKrw(pnl)}원 (${rate}%)</span>
+    </div>`+paper.trades.map(t=>{
+      const col=t.pnl>0?'#ef4444':t.pnl<0?'#3b82f6':'#64748b';
+      const dt=new Date(t.exitTime).toLocaleString('ko-KR',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'});
+      return`<div class="pp-row">
+        <div style="flex:1">
+          <div style="font-weight:700;font-size:11px">${t.sym.replace('USDT','')} <span style="font-size:9px;color:#64748b">${dt}</span></div>
+          <div style="font-size:10px;color:#64748b">$${fp(t.entryPrice)} → $${fp(t.exitPrice)}</div>
+        </div>
+        <div style="text-align:right">
+          <div style="color:${col};font-weight:700;font-size:11px;font-family:monospace">${t.pnl>=0?'+':''}${fmtKrw(t.pnl)}원</div>
+          <div style="color:${col};font-size:10px">${t.pnlPct>=0?'+':''}${t.pnlPct}%</div>
+        </div>
+      </div>`;
+    }).join('');
+  }
+}
 
 // ══════════════════════════════════════════
 // 로그인 / 인증
@@ -809,7 +1109,6 @@ function toggleMonLayout(){
 function loadSettings(){
   const s=localStorage.getItem('coinSignalCfg');
   if(s)cfg=JSON.parse(s);
-  _soundOff=(cfg.soundMode==='off');
   document.getElementById('tgToken').value=cfg.token||'';
   document.getElementById('tgChat').value=cfg.chatId||'';
   document.getElementById('tgMinSig').value=cfg.minSig||'BUY,SELL,STRONG_BUY,STRONG_SELL';
@@ -836,7 +1135,6 @@ function saveSettings(){
   cfg.buyFreq=parseInt(document.getElementById('buyFreq').value);
   cfg.sellFreq=parseInt(document.getElementById('sellFreq').value);
   cfg.monLayout=document.getElementById('monLayoutSel').value;
-  _soundOff=(cfg.soundMode==='off');
   applyMonLayout(cfg.monLayout);
   localStorage.setItem('coinSignalCfg',JSON.stringify(cfg));
   closeSettings();
@@ -852,12 +1150,7 @@ function saveSettings(){
 function toggleSoundPopup(){
   const p=document.getElementById('soundPopup');
   if(p.style.display==='none'||p.style.display===''){
-    // 현재 cfg 값 동기화
-    document.getElementById('qSoundMode').value=cfg.soundMode||'signal';
-    document.getElementById('qSoundVol').value=cfg.soundVol??60;
-    document.getElementById('qSoundVolVal').textContent=(cfg.soundVol??60)+'%';
-    document.getElementById('qBuyFreq').value=cfg.buyFreq||1047;
-    document.getElementById('qSellFreq').value=cfg.sellFreq||370;
+    syncSettingsFromCfg();
     p.style.display='flex';
   }else{
     p.style.display='none';
@@ -872,9 +1165,35 @@ document.addEventListener('click',e=>{
   }
 });
 
+function syncSettingsFromCfg(){
+  // 설정창 열기 전 현재 cfg 값으로 드롭다운 동기화
+  const sm=document.getElementById('soundMode');
+  const sv=document.getElementById('soundVol');
+  const svv=document.getElementById('soundVolVal');
+  const bf=document.getElementById('buyFreq');
+  const sf=document.getElementById('sellFreq');
+  const qs=document.getElementById('qSoundMode');
+  const qv=document.getElementById('qSoundVol');
+  const qvv=document.getElementById('qSoundVolVal');
+  const qb=document.getElementById('qBuyFreq');
+  const qsf=document.getElementById('qSellFreq');
+  const mode=cfg.soundMode||'signal';
+  const vol=cfg.soundVol??60;
+  if(sm)sm.value=mode;
+  if(sv)sv.value=vol;
+  if(svv)svv.textContent=vol+'%';
+  if(bf)bf.value=cfg.buyFreq||1047;
+  if(sf)sf.value=cfg.sellFreq||370;
+  if(qs)qs.value=mode;
+  if(qv)qv.value=vol;
+  if(qvv)qvv.textContent=vol+'%';
+  if(qb)qb.value=cfg.buyFreq||1047;
+  if(qsf)qsf.value=cfg.sellFreq||370;
+}
 function openSettings(){
   // 이미 설정 인증된 세션이면 바로 열기
   if(sessionStorage.getItem('settingAuthed')==='1'){
+    syncSettingsFromCfg();
     document.getElementById('settingPanel').classList.add('open');
   } else {
     const o=document.getElementById('settingAuthOverlay');
@@ -893,6 +1212,7 @@ function doSettingAuth(){
   if(id===auth.id&&pw===auth.pw){
     sessionStorage.setItem('settingAuthed','1');
     closeSettingAuth();
+    syncSettingsFromCfg();
     document.getElementById('settingPanel').classList.add('open');
   } else {
     document.getElementById('settingAuthErr').textContent='아이디 또는 비밀번호가 틀립니다.';
@@ -1421,6 +1741,8 @@ function updateSummary(res,elapsed){
 
 function setStatus(t,c){const el=document.getElementById('status');el.textContent=t;el.className=`st-${c}`;}
 
+function sigKo(s){return{STRONG_BUY:'강력매수',BUY:'매수',SELL:'매도',STRONG_SELL:'강력매도',HOLD:'관망'}[s]||s;}
+
 function showToast(sym,sig,price){
   const meta=KR_EX[sym.replace('USDT','')]||{};
   const div=document.createElement('div');
@@ -1429,6 +1751,7 @@ function showToast(sym,sig,price){
   div.textContent=`${isBuy?'▲':'▼'} ${sigKo(sig)} ${sym.replace('USDT','')}${meta.ko?`(${meta.ko})`:''} $${fp(price)}`;
   document.getElementById('toast').appendChild(div);setTimeout(()=>div.remove(),6000);
   playSignalSound(sig);
+  paperAutoTrade(sym,sig,price);
 }
 
 // ══════════════════════════════════════════
@@ -1509,6 +1832,7 @@ let _actx=null;
 function getActx(){if(!_actx)_actx=new(window.AudioContext||window.webkitAudioContext)();return _actx;}
 
 function playBeep(freq,dur=0.18,vol=0.6,type='sine'){
+  if(cfg.soundMode==='off'||vol<=0)return;
   try{
     const ctx=getActx();
     const osc=ctx.createOscillator();
@@ -1522,7 +1846,6 @@ function playBeep(freq,dur=0.18,vol=0.6,type='sine'){
 }
 
 function playSignalSound(sig){
-  if(_soundOff)return;
   const mode=cfg.soundMode||'signal';
   if(mode==='off')return;
   if(mode==='strong'&&sig!=='STRONG_BUY'&&sig!=='STRONG_SELL')return;
@@ -1544,8 +1867,8 @@ function playSignalSound(sig){
 }
 
 function testSound(){
-  if(_soundOff){alert('소리가 꺼져 있습니다. 알림 소리를 켜주세요.');return;}
-  const vol=(parseInt(document.getElementById('soundVol').value))/100*0.8;
+  if(cfg.soundMode==='off'){alert('소리가 꺼져 있습니다. 알림 소리를 켜주세요.');return;}
+  const vol=(cfg.soundVol??60)/100*0.8;
   if(vol<=0){alert('볼륨이 0%입니다. 볼륨을 높여주세요.');return;}
   const bf=parseInt(document.getElementById('buyFreq').value)||1047;
   const sf=parseInt(document.getElementById('sellFreq').value)||370;
@@ -1675,56 +1998,61 @@ function renderMonitor(){
   }).join('');
 }
 
-// 드래그 이동 + 전방향 리사이즈
+// 드래그 이동 + 전방향 리사이즈 (monitorPanel + paperPanel 공용)
 (()=>{
   const MIN_W=240, MIN_H=180;
-  let mode=null, dir='', ox=0, oy=0, r0={};
+  let mode=null, dir='', ox=0, oy=0, r0={}, activePanel=null;
 
-  function getPanel(){return document.getElementById('monitorPanel');}
-  function getHeader(){return document.getElementById('monitorHeader');}
+  const PANELS=[
+    {panel:'monitorPanel',header:'monitorHeader'},
+    {panel:'paperPanel',  header:'paperHeader'},
+  ];
 
   document.addEventListener('mousedown',e=>{
-    const el=getPanel();
-    if(!el||el.style.display==='none')return;
-    const rzEdge=e.target.closest('.rz-edge');
-    if(rzEdge){
-      mode='resize'; dir=rzEdge.dataset.d;
-      const rc=el.getBoundingClientRect();
-      r0={l:rc.left,t:rc.top,w:rc.width,h:rc.height};
-      ox=e.clientX; oy=e.clientY;
-      el.style.right='auto'; el.style.bottom='auto';
-      el.style.left=r0.l+'px'; el.style.top=r0.t+'px';
-      el.style.maxHeight='none';
-      e.preventDefault();
-    } else if(getHeader()&&getHeader().contains(e.target)){
-      mode='drag';
-      const rc=el.getBoundingClientRect();
-      r0={l:rc.left,t:rc.top};
-      ox=e.clientX; oy=e.clientY;
-      el.style.right='auto';
-      e.preventDefault();
+    for(const {panel,header} of PANELS){
+      const el=document.getElementById(panel);
+      if(!el||el.style.display==='none')continue;
+      const rzEdge=e.target.closest('.rz-edge');
+      if(rzEdge&&el.contains(rzEdge)){
+        mode='resize'; dir=rzEdge.dataset.d; activePanel=el;
+        const rc=el.getBoundingClientRect();
+        r0={l:rc.left,t:rc.top,w:rc.width,h:rc.height};
+        ox=e.clientX; oy=e.clientY;
+        el.style.right='auto'; el.style.bottom='auto';
+        el.style.left=r0.l+'px'; el.style.top=r0.t+'px';
+        el.style.maxHeight='none';
+        e.preventDefault(); return;
+      }
+      const hdr=document.getElementById(header);
+      if(hdr&&hdr.contains(e.target)){
+        mode='drag'; activePanel=el;
+        const rc=el.getBoundingClientRect();
+        r0={l:rc.left,t:rc.top};
+        ox=e.clientX; oy=e.clientY;
+        el.style.right='auto';
+        e.preventDefault(); return;
+      }
     }
   });
 
   document.addEventListener('mousemove',e=>{
-    if(!mode)return;
-    const el=getPanel();
+    if(!mode||!activePanel)return;
     const dx=e.clientX-ox, dy=e.clientY-oy;
     if(mode==='drag'){
-      el.style.left=(r0.l+dx)+'px';
-      el.style.top=(r0.t+dy)+'px';
+      activePanel.style.left=(r0.l+dx)+'px';
+      activePanel.style.top=(r0.t+dy)+'px';
     } else if(mode==='resize'){
       let {l,t,w,h}=r0;
       if(dir.includes('e')) w=Math.max(MIN_W,w+dx);
       if(dir.includes('s')) h=Math.max(MIN_H,h+dy);
       if(dir.includes('w')){const nw=Math.max(MIN_W,w-dx);l=l+(w-nw);w=nw;}
       if(dir.includes('n')){const nh=Math.max(MIN_H,h-dy);t=t+(h-nh);h=nh;}
-      el.style.left=l+'px'; el.style.top=t+'px';
-      el.style.width=w+'px'; el.style.height=h+'px';
+      activePanel.style.left=l+'px'; activePanel.style.top=t+'px';
+      activePanel.style.width=w+'px'; activePanel.style.height=h+'px';
     }
   });
 
-  document.addEventListener('mouseup',()=>{mode=null;dir='';});
+  document.addEventListener('mouseup',()=>{mode=null;dir='';activePanel=null;});
 })();
 
 // ══════════════════════════════════════════
@@ -1732,6 +2060,7 @@ function renderMonitor(){
 // ══════════════════════════════════════════
 loadSettings();
 checkLogin();
+loadPaper();
 fetchKrwRate();
 loadKrExchanges();
 setInterval(fetchKrwRate,300000);
