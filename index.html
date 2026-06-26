@@ -484,6 +484,30 @@ details summary{cursor:pointer;color:var(--muted);padding:2px 0;user-select:none
           <option value="all" selected>매수/매도 이상</option>
         </select>
       </div>
+      <div style="display:flex;flex-direction:column;gap:4px">
+        <label style="font-size:11px;color:#64748b">손절 % (0=비활성)</label>
+        <input id="ppStopLoss" type="number" min="0" max="50" step="0.5"
+          onchange="paper.stopLoss=parseFloat(this.value)||0;savePaper()"
+          style="background:#0b0e17;border:1px solid #7f1d1d;color:#fca5a5;border-radius:6px;padding:6px 10px;font-size:13px">
+      </div>
+      <div style="display:flex;flex-direction:column;gap:4px">
+        <label style="font-size:11px;color:#64748b">익절 % (0=비활성)</label>
+        <input id="ppTakeProfit" type="number" min="0" max="200" step="0.5"
+          onchange="paper.takeProfit=parseFloat(this.value)||0;savePaper()"
+          style="background:#0b0e17;border:1px solid #14532d;color:#86efac;border-radius:6px;padding:6px 10px;font-size:13px">
+      </div>
+      <div style="display:flex;flex-direction:column;gap:4px">
+        <label style="font-size:11px;color:#64748b">최대 보유시간 (0=무제한)</label>
+        <select id="ppMaxHold" onchange="paper.maxHoldHours=parseFloat(this.value);savePaper()"
+          style="background:#0b0e17;border:1px solid #1f2d45;color:#e2e8f0;border-radius:6px;padding:6px">
+          <option value="0">무제한</option>
+          <option value="1">1시간</option>
+          <option value="4">4시간</option>
+          <option value="12">12시간</option>
+          <option value="24">24시간</option>
+          <option value="72">3일</option>
+        </select>
+      </div>
       <button onclick="resetPaper()" style="background:#450a0a;border:1px solid #7f1d1d;color:#fca5a5;padding:7px;border-radius:6px;font-size:11px">🗑 모의투자 초기화</button>
     </div>
   </div>
@@ -853,8 +877,11 @@ let paper={
   balance:1000000,
   tradeRatio:0.10,
   sigCond:'all',
-  positions:{},  // {sym:{qty,entryPrice,entryTime,entryKrw}}
-  trades:[],     // 거래내역
+  stopLoss:3,      // 손절 % (0=비활성)
+  takeProfit:5,    // 익절 % (0=비활성)
+  maxHoldHours:24, // 최대 보유시간 (0=무제한)
+  positions:{},
+  trades:[],
 };
 
 function loadPaper(){
@@ -870,6 +897,9 @@ function openPaperPanel(){
   document.getElementById('ppInitBalance').value=paper.initBalance;
   document.getElementById('ppTradeRatio').value=paper.tradeRatio;
   document.getElementById('ppSigCond').value=paper.sigCond;
+  document.getElementById('ppStopLoss').value=paper.stopLoss??3;
+  document.getElementById('ppTakeProfit').value=paper.takeProfit??5;
+  document.getElementById('ppMaxHold').value=paper.maxHoldHours??24;
 }
 function closePaperPanel(){document.getElementById('paperPanel').style.display='none';}
 
@@ -951,6 +981,32 @@ function paperSell(sym,price,sig){
   savePaper();renderPaper();
 }
 
+// 손절/익절/보유시간 초과 자동청산 (스캔 결과로 현재가 업데이트될 때 호출)
+function paperCheckRisk(sym, curPrice){
+  if(!paper.enabled)return;
+  const pos=paper.positions[sym];
+  if(!pos)return;
+  const krwRate=usdKrw||1380;
+  const curKrw=pos.qty*curPrice*krwRate;
+  const pnlPct=(curKrw-pos.entryKrw)/pos.entryKrw*100;
+
+  // 손절
+  if(paper.stopLoss>0 && pnlPct<=-paper.stopLoss){
+    paperSell(sym,curPrice,'손절');
+    return;
+  }
+  // 익절
+  if(paper.takeProfit>0 && pnlPct>=paper.takeProfit){
+    paperSell(sym,curPrice,'익절');
+    return;
+  }
+  // 최대 보유시간 초과
+  if(paper.maxHoldHours>0){
+    const heldHours=(Date.now()-new Date(pos.entryTime).getTime())/3600000;
+    if(heldHours>=paper.maxHoldHours) paperSell(sym,curPrice,'시간초과');
+  }
+}
+
 // 신호 발생 시 자동매매 실행
 function paperAutoTrade(sym,sig,price){
   if(!paper.enabled)return;
@@ -958,7 +1014,8 @@ function paperAutoTrade(sym,sig,price){
   const isBuySignal=sig==='STRONG_BUY'||(cond==='all'&&sig==='BUY');
   const isSellSignal=sig==='STRONG_SELL'||(cond==='all'&&sig==='SELL');
   if(isBuySignal)paperBuy(sym,price,sig);
-  if(isSellSignal)paperSell(sym,price,sig);
+  else if(isSellSignal)paperSell(sym,price,sig);
+  else paperCheckRisk(sym,price); // 신호 없어도 현재가로 리스크 체크
 }
 
 function fmtKrw(v){
