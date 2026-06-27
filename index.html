@@ -1489,20 +1489,37 @@ function calcEntry(signal,price,sr,atr){
 // ══════════════════════════════════════════
 function sTech(ind){const sc=[];
   const{rsi,macd,macdSig,prevMacd,prevMacdSig,e9,e21,e50,bbU,bbL,stK,stD,close}=ind;
-  if(!isNaN(rsi)){if(rsi<=25)sc.push({n:'RSI',s:1.0,w:1.2,r:`극단과매도 ${rsi.toFixed(1)}`});
-    else if(rsi<=30)sc.push({n:'RSI',s:0.8,w:1.0,r:`과매도 ${rsi.toFixed(1)}`});
-    else if(rsi>=75)sc.push({n:'RSI',s:-1.0,w:1.2,r:`극단과매수 ${rsi.toFixed(1)}`});
-    else if(rsi>=70)sc.push({n:'RSI',s:-0.8,w:1.0,r:`과매수 ${rsi.toFixed(1)}`});
-    else if(rsi<45)sc.push({n:'RSI',s:0.2,w:0.4,r:`중립하단 ${rsi.toFixed(1)}`});
-    else if(rsi>55)sc.push({n:'RSI',s:-0.2,w:0.4,r:`중립상단 ${rsi.toFixed(1)}`});}
+  const macdDir=!isNaN(macd)?(macd-macdSig):0; // MACD 방향 (양수=매수세)
+
+  // RSI: MACD 방향과 일치 시 가중치 증가 (연구결과: 두 지표 합의 시 승률↑)
+  if(!isNaN(rsi)){
+    const rsiMacdAgree=(rsi<50&&macdDir>0)||(rsi>50&&macdDir<0);
+    const w=rsiMacdAgree?1.4:0.9; // 합의 시 가중치 +55%
+    if(rsi<=25)sc.push({n:'RSI',s:1.0,w:w*1.2,r:`극단과매도 ${rsi.toFixed(1)}`});
+    else if(rsi<=35)sc.push({n:'RSI',s:0.8,w:w*1.0,r:`과매도 ${rsi.toFixed(1)}`});
+    else if(rsi>=75)sc.push({n:'RSI',s:-1.0,w:w*1.2,r:`극단과매수 ${rsi.toFixed(1)}`});
+    else if(rsi>=65)sc.push({n:'RSI',s:-0.8,w:w*1.0,r:`과매수 ${rsi.toFixed(1)}`});
+    else if(rsi<45)sc.push({n:'RSI',s:0.15,w:0.3,r:`중립하단 ${rsi.toFixed(1)}`});
+    else if(rsi>55)sc.push({n:'RSI',s:-0.15,w:0.3,r:`중립상단 ${rsi.toFixed(1)}`});}
+
+  // MACD: 크로스 시 강한 신호, 단순 방향은 약한 신호
   if(!isNaN(macd)&&!isNaN(prevMacd)){const pd=prevMacd-prevMacdSig,ld=macd-macdSig;
-    if(pd<0&&ld>0)sc.push({n:'MACD',s:0.9,w:1.2,r:'골든크로스'});
-    else if(pd>0&&ld<0)sc.push({n:'MACD',s:-0.9,w:1.2,r:'데드크로스'});
-    else sc.push({n:'MACD',s:ld>0?0.3:-0.3,w:0.6,r:ld>0?'양수':'음수'});}
+    if(pd<0&&ld>0)sc.push({n:'MACD',s:0.9,w:1.3,r:'골든크로스'});
+    else if(pd>0&&ld<0)sc.push({n:'MACD',s:-0.9,w:1.3,r:'데드크로스'});
+    else sc.push({n:'MACD',s:ld>0?0.2:-0.2,w:0.5,r:ld>0?'양수유지':'음수유지'});}
   if(!isNaN(e9)&&!isNaN(e21)&&!isNaN(e50)){
-    if(e9>e21&&e21>e50&&close>e9)sc.push({n:'EMA',s:0.7,w:1.0,r:'정배열'});
-    else if(e9<e21&&e21<e50&&close<e9)sc.push({n:'EMA',s:-0.7,w:1.0,r:'역배열'});
-    else sc.push({n:'EMA',s:e9>e21?0.3:-0.3,w:0.5,r:e9>e21?'단기상향':'단기하향'});}
+    const{e200}=ind;
+    const aboveE200=!isNaN(e200)&&close>e200;
+    const belowE200=!isNaN(e200)&&close<e200;
+    // EMA200 트렌드 방향 (연구결과: 가장 중요한 트렌드 필터)
+    if(!isNaN(e200)){
+      if(aboveE200)sc.push({n:'EMA200',s:0.5,w:1.3,r:`200선 위(상승추세) +${((close/e200-1)*100).toFixed(1)}%`});
+      else sc.push({n:'EMA200',s:-0.5,w:1.3,r:`200선 아래(하락추세) ${((close/e200-1)*100).toFixed(1)}%`});
+    }
+    // 단기 EMA 배열 (EMA200 방향 일치 시 가중치 증가)
+    if(e9>e21&&e21>e50&&close>e9)sc.push({n:'EMA',s:0.7,w:aboveE200?1.2:0.6,r:'단기정배열'});
+    else if(e9<e21&&e21<e50&&close<e9)sc.push({n:'EMA',s:-0.7,w:belowE200?1.2:0.6,r:'단기역배열'});
+    else sc.push({n:'EMA',s:e9>e21?0.2:-0.2,w:0.4,r:e9>e21?'단기상향':'단기하향'});}
   if(!isNaN(bbL)&&!isNaN(bbU)){const pct=(close-bbL)/(bbU-bbL+1e-9);
     if(close<=bbL)sc.push({n:'BB',s:0.8,w:0.9,r:'하단이탈'});
     else if(close>=bbU)sc.push({n:'BB',s:-0.8,w:0.9,r:'상단이탈'});
@@ -1565,7 +1582,7 @@ async function analyze(symInfo,tf){
   const cl=klines.map(k=>k.c),hi=klines.map(k=>k.h),lo=klines.map(k=>k.l),vo=klines.map(k=>k.v);
 
   const rsiA=calcRSI(cl),macdO=calcMACD(cl),bbO=calcBB(cl),stO=calcStoch(hi,lo,cl);
-  const e9A=ema(cl,9),e21A=ema(cl,21),e50A=ema(cl,50);
+  const e9A=ema(cl,9),e21A=ema(cl,21),e50A=ema(cl,50),e200A=ema(cl,200);
   const atrA=calcATR(hi,lo,cl),obvA=calcOBV(cl,vo),mfiA=calcMFI(hi,lo,cl,vo),vwapA=calcVWAP(hi,lo,cl,vo);
   const vma=sma(vo,20);
   const atr=atrA[i]||cl[i]*0.01;
@@ -1573,14 +1590,32 @@ async function analyze(symInfo,tf){
   const obvSlope=obvA[ip]?(obvA[i]-obvA[i-4])/(Math.abs(obvA[i-4])+1e-9):NaN;
 
   const ind={close:cl[i],rsi:rsiA[i],macd:macdO.m[i],macdSig:macdO.sig[i],
-    prevMacd:macdO.m[ip],prevMacdSig:macdO.sig[ip],e9:e9A[i],e21:e21A[i],e50:e50A[i],
+    prevMacd:macdO.m[ip],prevMacdSig:macdO.sig[ip],e9:e9A[i],e21:e21A[i],e50:e50A[i],e200:e200A[i],
     bbU:bbO.u[i],bbL:bbO.l[i],stK:stO.k[i],stD:stO.d[i],atr,
     volR,pUp:cl[i]>cl[ip],obvSlope,mfi:mfiA[i],vwap:vwapA[i]};
 
   const{det,sr}=detectPat(cl,atr);
   const tSc=sTech(ind),vSc=sVol(ind),pSc=sPat(det,sr,cl[i],atr);
   const t=wavg(tSc),v=wavg(vSc),p=wavg(pSc);
-  const final=t*0.40+v*0.30+p*0.30;
+
+  // ── EMA200 트렌드 필터 적용 ──
+  // 연구결과: EMA200 위 = 상승추세(매수우호), 아래 = 하락추세(매도우호)
+  let final=t*0.40+v*0.30+p*0.30;
+  const e200=e200A[i];
+  if(!isNaN(e200)){
+    const aboveE200=cl[i]>e200;
+    // 역추세 신호는 강도 50% 감쇠
+    if(final>0&&!aboveE200) final*=0.5;  // 하락추세에서 매수신호 약화
+    if(final<0&&aboveE200)  final*=0.5;  // 상승추세에서 매도신호 약화
+    // 추세 일치 강력 신호는 10% 증폭
+    if(final>0.4&&aboveE200)  final=Math.min(final*1.1,1);
+    if(final<-0.4&&!aboveE200) final=Math.max(final*1.1,-1);
+  }
+
+  // ── 거래량 필터: 거래량 부족 시 신호 강도 제한 ──
+  // 연구결과: 거래량 확인 없는 신호는 가짜 돌파 가능성 높음
+  if(!isNaN(volR)&&volR<0.8) final*=0.6; // 거래량 급감 시 신호 약화
+
   const signal=classify(final);
   const entry=calcEntry(signal,cl[i],sr,atr);
   const sl=signal.includes('BUY')?cl[i]-atr*1.5:signal.includes('SELL')?cl[i]+atr*1.5:null;
