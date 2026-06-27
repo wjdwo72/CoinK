@@ -949,29 +949,33 @@ function resetPaper(){
 }
 
 // 모의 매수
-function paperBuy(sym,price,sig){
-  if(paper.positions[sym])return; // 이미 포지션 있음
+function paperBuy(sym,price,sig,atrSl,atrTp){
+  if(paper.positions[sym])return;
   const krwRate=usdKrw||1380;
   const tradeKrw=paper.balance*paper.tradeRatio;
-  if(tradeKrw<1000)return; // 잔고 부족
-  const tradeUsd=tradeKrw/krwRate;
-  const qty=tradeUsd/price;
+  if(tradeKrw<1000)return;
+  const qty=(tradeKrw/krwRate)/price;
   paper.balance-=tradeKrw;
-  paper.positions[sym]={qty,entryPrice:price,entryTime:new Date().toISOString(),entryKrw:tradeKrw,sig};
+  paper.positions[sym]={
+    qty,entryPrice:price,entryKrw:tradeKrw,sig,
+    entryTime:new Date().toISOString(),
+    atrSl:atrSl||null,   // ATR 기반 손절가
+    atrTp:atrTp||null,   // ATR 기반 익절가
+  };
   savePaper();renderPaper();
 }
 
 // 모의 매도
-function paperSell(sym,price,sig){
+function paperSell(sym,price,reason){
   const pos=paper.positions[sym];
   if(!pos)return;
   const krwRate=usdKrw||1380;
   const exitKrw=pos.qty*price*krwRate;
   const pnl=exitKrw-pos.entryKrw;
-  const pnlPct=(pnl/pos.entryKrw*100).toFixed(2);
+  const pnlPct=parseFloat((pnl/pos.entryKrw*100).toFixed(2));
   paper.balance+=exitKrw;
   paper.trades.unshift({
-    sym,buySig:pos.sig,sellSig:sig,
+    sym,buySig:pos.sig,sellReason:reason,
     entryPrice:pos.entryPrice,exitPrice:price,
     entryKrw:pos.entryKrw,exitKrw,pnl,pnlPct,
     entryTime:pos.entryTime,exitTime:new Date().toISOString(),
@@ -981,8 +985,9 @@ function paperSell(sym,price,sig){
   savePaper();renderPaper();
 }
 
-// 손절/익절/보유시간 초과 자동청산 (스캔 결과로 현재가 업데이트될 때 호출)
-function paperCheckRisk(sym, curPrice){
+// ── 리스크 관리: 매 스캔마다 포지션 점검 ──
+// ATR 손절/익절 우선, 없으면 설정값 % 사용
+function paperCheckRisk(sym,curPrice){
   if(!paper.enabled)return;
   const pos=paper.positions[sym];
   if(!pos)return;
@@ -990,32 +995,60 @@ function paperCheckRisk(sym, curPrice){
   const curKrw=pos.qty*curPrice*krwRate;
   const pnlPct=(curKrw-pos.entryKrw)/pos.entryKrw*100;
 
-  // 손절
-  if(paper.stopLoss>0 && pnlPct<=-paper.stopLoss){
-    paperSell(sym,curPrice,'손절');
-    return;
-  }
-  // 익절
-  if(paper.takeProfit>0 && pnlPct>=paper.takeProfit){
-    paperSell(sym,curPrice,'익절');
-    return;
-  }
+  // ATR 기반 손절 (연구결과: ATR×1.5 손절이 고정% 보다 정확)
+  if(pos.atrSl&&curPrice<=pos.atrSl){paperSell(sym,curPrice,'ATR손절');return;}
+  // ATR 기반 익절
+  if(pos.atrTp&&curPrice>=pos.atrTp){paperSell(sym,curPrice,'ATR익절');return;}
+  // 설정 손절 %
+  if(paper.stopLoss>0&&pnlPct<=-paper.stopLoss){paperSell(sym,curPrice,'손절');return;}
+  // 설정 익절 %
+  if(paper.takeProfit>0&&pnlPct>=paper.takeProfit){paperSell(sym,curPrice,'익절');return;}
   // 최대 보유시간 초과
   if(paper.maxHoldHours>0){
-    const heldHours=(Date.now()-new Date(pos.entryTime).getTime())/3600000;
-    if(heldHours>=paper.maxHoldHours) paperSell(sym,curPrice,'시간초과');
+    const hrs=(Date.now()-new Date(pos.entryTime).getTime())/3600000;
+    if(hrs>=paper.maxHoldHours)paperSell(sym,curPrice,'시간초과');
   }
 }
 
-// 신호 발생 시 자동매매 실행
+// ── 자동매매 실행 (연구결과 필터 적용) ──
 function paperAutoTrade(sym,sig,price){
   if(!paper.enabled)return;
+  const r=lastResults.find(x=>x.sym===sym);
+  const ind=r?.ind||{};
+
   const cond=paper.sigCond||'all';
-  const isBuySignal=sig==='STRONG_BUY'||(cond==='all'&&sig==='BUY');
-  const isSellSignal=sig==='STRONG_SELL'||(cond==='all'&&sig==='SELL');
-  if(isBuySignal)paperBuy(sym,price,sig);
-  else if(isSellSignal)paperSell(sym,price,sig);
-  else paperCheckRisk(sym,price); // 신호 없어도 현재가로 리스크 체크
+  const isBuy=sig==='STRONG_BUY'||(cond==='all'&&sig==='BUY');
+  const isSell=sig==='STRONG_SELL'||(cond==='all'&&sig==='SELL');
+
+  if(isBuy&&!paper.positions[sym]){
+    // ① EMA200 트렌드 필터 (연구결과: 가장 중요한 필터)
+    //    하락추세(가격<EMA200)에서 매수 차단 → 역추세 손실 방지
+    if(!isNaN(ind.e200)&&price<ind.e200*0.995){
+      return; // EMA200 아래 1% 이상 → 하락추세, 매수 안 함
+    }
+    // ② RSI 과매수 차단 (연구결과: RSI>65에서 매수하면 고점 매수 가능성↑)
+    if(!isNaN(ind.rsi)&&ind.rsi>65){
+      return; // 이미 과매수 구간
+    }
+    // ③ 거래량 확인 (연구결과: 거래량 없는 신호는 가짜 돌파)
+    if(!isNaN(ind.volR)&&ind.volR<0.7){
+      return; // 거래량 부족
+    }
+    // ④ MACD 방향 확인: 매수할 때 MACD가 최소 상승 방향이어야 함
+    const macdDir=!isNaN(ind.macd)&&!isNaN(ind.macdSig)?(ind.macd-ind.macdSig):0;
+    if(sig==='BUY'&&macdDir<0){
+      return; // 일반 BUY는 MACD 방향 확인 필요 (STRONG_BUY는 통과)
+    }
+    // 매수 실행 - ATR 기반 손절/익절가 전달
+    paperBuy(sym,price,sig,r?.sl,r?.tp);
+
+  }else if(isSell&&paper.positions[sym]){
+    paperSell(sym,price,sig);
+
+  }else{
+    // 신호와 무관하게 포지션 리스크 점검
+    paperCheckRisk(sym,price);
+  }
 }
 
 function fmtKrw(v){
