@@ -931,7 +931,7 @@ function editPaperBalance(){
   if(input===null)return;
   const v=parseInt(input.replace(/,/g,''))||cur;
   if(v<0||isNaN(v))return;
-  paper.balance=v; paper.initBalance=v;
+  paper.balance=v; // initBalance는 변경하지 않음 (수익률 기준 유지)
   savePaper(); renderPaper();
 }
 
@@ -955,13 +955,22 @@ function paperBuy(sym,price,sig,atrSl,atrTp){
   const tradeKrw=paper.balance*paper.tradeRatio;
   if(tradeKrw<1000)return;
   const qty=(tradeKrw/krwRate)/price;
+  const entryTime=new Date().toISOString();
   paper.balance-=tradeKrw;
   paper.positions[sym]={
     qty,entryPrice:price,entryKrw:tradeKrw,sig,
-    entryTime:new Date().toISOString(),
-    atrSl:atrSl||null,   // ATR 기반 손절가
-    atrTp:atrTp||null,   // ATR 기반 익절가
+    entryTime,
+    atrSl:atrSl||null,
+    atrTp:atrTp||null,
   };
+  // 매수 기록을 거래내역에 추가
+  paper.trades.unshift({
+    sym,type:'BUY',buySig:sig,
+    entryPrice:price,exitPrice:null,
+    entryKrw:tradeKrw,exitKrw:null,pnl:null,pnlPct:null,
+    entryTime,exitTime:null,sellReason:null,
+  });
+  if(paper.trades.length>400)paper.trades=paper.trades.slice(0,400);
   savePaper();renderPaper();
 }
 
@@ -974,13 +983,14 @@ function paperSell(sym,price,reason){
   const pnl=exitKrw-pos.entryKrw;
   const pnlPct=parseFloat((pnl/pos.entryKrw*100).toFixed(2));
   paper.balance+=exitKrw;
+  const exitTime=new Date().toISOString();
   paper.trades.unshift({
-    sym,buySig:pos.sig,sellReason:reason,
+    sym,type:'SELL',buySig:pos.sig,sellReason:reason,
     entryPrice:pos.entryPrice,exitPrice:price,
     entryKrw:pos.entryKrw,exitKrw,pnl,pnlPct,
-    entryTime:pos.entryTime,exitTime:new Date().toISOString(),
+    entryTime:pos.entryTime,exitTime,
   });
-  if(paper.trades.length>200)paper.trades=paper.trades.slice(0,200);
+  if(paper.trades.length>400)paper.trades=paper.trades.slice(0,400);
   delete paper.positions[sym];
   savePaper();renderPaper();
 }
@@ -1065,8 +1075,10 @@ function renderPaper(){
     const r=lastResults.find(r=>r.sym===sym);
     return s+(r?pos.qty*r.price*krwRate:pos.entryKrw);
   },0);
-  const totalAsset=paper.balance+posValue;
-  const pnl=totalAsset-paper.initBalance;
+  // 실현손익(완료된 거래) + 미실현손익(보유 포지션)
+  const realizedPnl=paper.trades.filter(t=>t.type==='SELL').reduce((s,t)=>s+t.pnl,0);
+  const unrealizedPnl=posValue-totalInvested;
+  const pnl=realizedPnl+unrealizedPnl;
   const rate=paper.initBalance>0?(pnl/paper.initBalance*100).toFixed(2):0;
   const pnlCol=pnl>0?'#ef4444':pnl<0?'#3b82f6':'#64748b';
 
@@ -1118,22 +1130,28 @@ function renderPaper(){
   if(!paper.trades.length){
     histEl.innerHTML='<div style="text-align:center;color:#64748b;font-size:11px;padding:20px">거래 없음</div>';
   }else{
-    const tot=paper.trades.length;
-    const wins=paper.trades.filter(t=>t.pnl>0).length;
-    histEl.innerHTML=`<div style="padding:6px 10px;background:#0b0e17;font-size:10px;color:#64748b;display:flex;gap:10px">
-      <span>총 ${tot}건</span><span style="color:#ef4444">수익 ${wins}건</span><span style="color:#3b82f6">손실 ${tot-wins}건</span>
+    const sellTrades=paper.trades.filter(t=>t.type==='SELL');
+    const wins=sellTrades.filter(t=>t.pnl>0).length;
+    const losses=sellTrades.filter(t=>t.pnl<0).length;
+    histEl.innerHTML=`<div style="padding:6px 10px;background:#0b0e17;font-size:10px;color:#64748b;display:flex;gap:10px;flex-wrap:wrap">
+      <span>청산 ${sellTrades.length}건</span><span style="color:#ef4444">수익 ${wins}건</span><span style="color:#3b82f6">손실 ${losses}건</span>
       <span style="margin-left:auto;color:${pnl>=0?'#ef4444':'#3b82f6'}">${pnl>=0?'+':''}${fmtKrw(pnl)}원 (${rate}%)</span>
     </div>`+paper.trades.map(t=>{
-      const col=t.pnl>0?'#ef4444':t.pnl<0?'#3b82f6':'#64748b';
-      const dt=new Date(t.exitTime).toLocaleString('ko-KR',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'});
+      const isBuy=t.type==='BUY';
+      const col=isBuy?'#a855f7':t.pnl>0?'#ef4444':t.pnl<0?'#3b82f6':'#64748b';
+      const timeStr=isBuy?t.entryTime:t.exitTime;
+      const dt=new Date(timeStr).toLocaleString('ko-KR',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'});
+      const typeLabel=isBuy?`<span style="font-size:9px;padding:1px 5px;background:#2e1065;border:1px solid #7c3aed;color:#c4b5fd;border-radius:3px">매수</span>`:`<span style="font-size:9px;padding:1px 5px;background:#1e3a8a;border:1px solid #1d4ed8;color:#93c5fd;border-radius:3px">${t.sellReason||'청산'}</span>`;
       return`<div class="pp-row">
         <div style="flex:1">
-          <div style="font-weight:700;font-size:11px">${t.sym.replace('USDT','')} <span style="font-size:9px;color:#64748b">${dt}</span></div>
-          <div style="font-size:10px;color:#64748b">$${fp(t.entryPrice)} → $${fp(t.exitPrice)}</div>
+          <div style="font-weight:700;font-size:11px;display:flex;align-items:center;gap:4px">${t.sym.replace('USDT','')} ${typeLabel} <span style="font-size:9px;color:#64748b">${dt}</span></div>
+          <div style="font-size:10px;color:#64748b">${isBuy?`매수가 $${fp(t.entryPrice)}`:`$${fp(t.entryPrice)} → $${fp(t.exitPrice)}`}</div>
         </div>
         <div style="text-align:right">
-          <div style="color:${col};font-weight:700;font-size:11px;font-family:monospace">${t.pnl>=0?'+':''}${fmtKrw(t.pnl)}원</div>
-          <div style="color:${col};font-size:10px">${t.pnlPct>=0?'+':''}${t.pnlPct}%</div>
+          ${isBuy
+            ?`<div style="color:#a855f7;font-size:11px;font-family:monospace">-${fmtKrw(t.entryKrw)}원</div><div style="color:#64748b;font-size:10px">보유중</div>`
+            :`<div style="color:${col};font-weight:700;font-size:11px;font-family:monospace">${t.pnl>=0?'+':''}${fmtKrw(t.pnl)}원</div><div style="color:${col};font-size:10px">${t.pnlPct>=0?'+':''}${t.pnlPct}%</div>`
+          }
         </div>
       </div>`;
     }).join('');
